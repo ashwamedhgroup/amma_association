@@ -54,37 +54,12 @@ class Notice(models.Model):
     def __str__(self):
         return self.title
 
-
-class Product(models.Model):
-    REGISTRATION_STATUS_CHOICES = (
-        ("registered", "Registered"),
-        ("pending", "Pending"),
-    )
-    CATEGORY_CHOICES = (
-        ("biofertilizer", "Biofertilizer"),
-        ("biopesticide", "Biopesticide"),
-        ("biostimulant", "Biostimulant"),
-        ("biocontrol", "Biocontrol"),
-    )
-    product_name = models.CharField(max_length=255)
-    biocontrol_agent_name = models.CharField(max_length=255)
-    biocontrol_agent_strain = models.CharField(max_length=255)
-    category = models.CharField(max_length=255, choices=CATEGORY_CHOICES)
-    formulation = models.TextField()
-    registration_status = models.CharField(
-        max_length=255, choices=REGISTRATION_STATUS_CHOICES)
-    country = models.TextField(max_length=255)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    def __str__(self):
-        return self.product_name
 '''
-
-
 # ------------------------------------------------------------
 # 1️⃣ REGISTRATION – Basic company / user profile
 # ------------------------------------------------------------
+
+
 class Registration(models.Model):
     USER_TYPES = (
         ("company", "Company"),
@@ -100,7 +75,7 @@ class Registration(models.Model):
     country = models.CharField(max_length=100)
     state = models.CharField(max_length=100)
     district = models.CharField(max_length=100, blank=True, null=True)
-    city = models.CharField(max_length=100,)
+    city = models.CharField(max_length=100)
     pincode = models.CharField(max_length=10)
     website = models.URLField(blank=True, null=True)
     is_verified = models.BooleanField(default=False)
@@ -109,6 +84,73 @@ class Registration(models.Model):
 
     def __str__(self):
         return f"{self.user.first_name} {self.user.last_name} ({self.user_type})"
+
+
+class Product(models.Model):
+    CATEGORY_CHOICES = (
+        ("biofertilizer", "Biofertilizer"),
+        ("biopesticide", "Biopesticide"),
+        ("biostimulant", "Biostimulant"),
+        ("biocontrol", "Biocontrol"),
+    )
+
+    FORMULATION_CHOICES = (
+        ("aqueous_suspension", "Aqueous Suspension"),
+        ("wettable_powder", "Wettable Powder"),
+        ("emulsion", "Emulsion"),
+        ("suspension", "Suspension"),
+    )
+
+    product_name = models.CharField(max_length=255)
+    biocontrol_agent_name = models.CharField(max_length=255)
+    biocontrol_agent_strain = models.CharField(max_length=255)
+    accession_number = models.CharField(max_length=255, blank=True, null=True)
+    category = models.CharField(max_length=255, choices=CATEGORY_CHOICES)
+    cfu = models.CharField(max_length=255, blank=True, null=True)
+    formulation = models.CharField(max_length=255, choices=FORMULATION_CHOICES)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.product_name} ({self.category})"
+
+
+class ProductRegistration(models.Model):
+    REGISTRATION_STATUS_CHOICES = (
+        ("registered", "Registered"),
+        ("pending", "Pending"),
+        ("rejected", "Rejected"),
+    )
+
+    product = models.ForeignKey(
+        Product, on_delete=models.CASCADE, related_name="registrations"
+    )
+    country = models.CharField(max_length=100)
+    registration_status = models.CharField(
+        max_length=50, choices=REGISTRATION_STATUS_CHOICES, default="pending"
+    )
+    registration_number = models.CharField(
+        max_length=255, blank=True, null=True)
+    registration_date = models.DateField(blank=True, null=True)
+    expiry_date = models.DateField(blank=True, null=True)
+    remarks = models.TextField(blank=True, null=True)
+
+    class Meta:
+        unique_together = ("product", "country")
+
+    def __str__(self):
+        return f"{self.product.product_name} - {self.country}"
+
+
+class ProductDocument(models.Model):
+    product = models.ForeignKey(
+        Product, on_delete=models.CASCADE, related_name="documents")
+    document_name = models.CharField(max_length=255)
+    file = models.FileField(upload_to="product_docs/", blank=True, null=True)
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.document_name} ({self.product.product_name})"
 
 
 '''
@@ -146,39 +188,10 @@ class Membership(models.Model):
 # ------------------------------------------------------------
 # 3️⃣ PRODUCT – Products for registration
 # ------------------------------------------------------------
-class Product(models.Model):
-    CATEGORY_CHOICES = (
-        ("Biofertilizer", "Biofertilizer"),
-        ("Biopesticide", "Biopesticide"),
-        ("PGR", "PGR"),
-        ("Other", "Other"),
-    )
-    FORMULATION_CHOICES = (
-        ("Granule", "Granule"),
-        ("Liquid", "Liquid"),
-        ("Powder", "Powder"),
-    )
-    membership = models.ForeignKey(Membership, on_delete=models.CASCADE)
-    name = models.CharField(max_length=255)
-    category = models.CharField(max_length=100, choices=CATEGORY_CHOICES)
-    formulation_type = models.CharField(
-        max_length=50, choices=FORMULATION_CHOICES)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    def __str__(self):
-        return self.name
 
 
-class ProductDocument(models.Model):
-    product = models.ForeignKey(
-        Product, on_delete=models.CASCADE, related_name="documents")
-    document_name = models.CharField(max_length=255)
-    file = models.FileField(upload_to="product_docs/")
-    uploaded_at = models.DateTimeField(auto_now_add=True)
 
-    def __str__(self):
-        return f"{self.document_name} ({self.product.name})"
+
 
 
 # ------------------------------------------------------------
@@ -224,7 +237,7 @@ class QuotationItem(models.Model):
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.service_name} ({self.product.name})"
+        return f"{self.service_name} ({self.product.product_name})"
 
 
 # ------------------------------------------------------------
@@ -264,7 +277,7 @@ class OrderItem(models.Model):
     remarks = models.TextField(blank=True, null=True)
 
     def __str__(self):
-        return f"{self.service_name} ({self.product.name})"
+        return f"{self.service_name} ({self.product.product_name})"
 
 
 # ------------------------------------------------------------
