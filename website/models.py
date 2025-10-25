@@ -71,6 +71,7 @@ class Registration(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     user_type = models.CharField(max_length=50, choices=USER_TYPES)
     contact_number = models.CharField(max_length=20)
+    institution_name = models.CharField(max_length=255, blank=True, null=True)
     designation = models.CharField(max_length=100, blank=True, null=True)
     country = models.CharField(max_length=100)
     state = models.CharField(max_length=100)
@@ -153,65 +154,182 @@ class ProductDocument(models.Model):
         return f"{self.document_name} ({self.product.product_name})"
 
 
-'''
-# ------------------------------------------------------------
-# 2️⃣ MEMBERSHIP – Company membership under AMMA
-# ------------------------------------------------------------
 class Membership(models.Model):
-    registration = models.ForeignKey(Registration, on_delete=models.CASCADE)
+    MEMBERSHIP_TYPES = (
+        ("data", "Data Membership"),
+    )
+
+    PAYMENT_STATUS_CHOICES = (
+        ("pending", "Pending"),
+        ("partially_paid", "Partially Paid"),
+        ("paid", "Paid"),
+        ("failed", "Failed"),
+        ("refunded", "Refunded"),
+    )
+
+    MEMBERSHIP_STATUS_CHOICES = (
+        ("inactive", "Inactive"),
+        ("active", "Active"),
+    )
+
+    registration = models.ForeignKey(
+        "Registration", on_delete=models.CASCADE, related_name="memberships"
+    )
     company_name = models.CharField(max_length=255)
     email = models.EmailField()
     phone = models.CharField(max_length=20)
     country = models.CharField(max_length=100)
     state = models.CharField(max_length=100)
+    district = models.CharField(max_length=100, blank=True, null=True)
     city = models.CharField(max_length=100)
+    address = models.TextField(blank=True, null=True)
+
     pincode = models.CharField(max_length=10)
-    cin = models.CharField(max_length=50, blank=True, null=True)
-    gst = models.CharField(max_length=50, blank=True, null=True)
-    tan = models.CharField(max_length=50, blank=True, null=True)
-    pan = models.CharField(max_length=50, blank=True, null=True)
-    vat = models.CharField(max_length=50, blank=True, null=True)
-    payment_receipt = models.FileField(upload_to="membership_payments/")
-    membership_type = models.CharField(max_length=100, default="Data")
-    payment_status = models.CharField(max_length=50, default="Pending")
-    membership_status = models.CharField(max_length=50, default="Inactive")
+
+    membership_type = models.CharField(
+        max_length=50, choices=MEMBERSHIP_TYPES, default="data"
+    )
+    payment_status = models.CharField(
+        max_length=20, choices=PAYMENT_STATUS_CHOICES, default="pending"
+    )
+    membership_status = models.CharField(
+        max_length=20, choices=MEMBERSHIP_STATUS_CHOICES, default="inactive"
+    )
+
     start_date = models.DateField(blank=True, null=True)
     end_date = models.DateField(blank=True, null=True)
     remarks = models.TextField(blank=True, null=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return self.company_name
+        return f"{self.company_name} - {self.membership_type}"
 
 
-# ------------------------------------------------------------
-# 3️⃣ PRODUCT – Products for registration
-# ------------------------------------------------------------
+class MembershipDocument(models.Model):
+    DOCUMENT_VERIFICATION_STATUS_CHOICES = (
+        ("pending", "Pending"),
+        ("verified", "Verified"),
+        ("rejected", "Rejected"),
+    )
+    DOCUMENT_TYPES = (
+        # 1️⃣ Entity Proof
+        ("certificate_of_incorporation", "Certificate of Incorporation"),
+        ("tax_registration_certificate", "Tax / VAT / GST Certificate"),
+
+        # 2️⃣ Identity & Authorization
+        ("government_id_proof", "Government / National ID or Passport"),
+        ("authorized_signatory_letter",
+         "Authorized Signatory / Board Authorization Letter"),
+
+        # 3️⃣ Address & Banking
+        ("registered_address_proof", "Registered / Operational Address Proof"),
+        ("bank_account_proof", "Bank Account Proof (Cheque / Statement)"),
+    )
+
+    membership = models.ForeignKey(
+        Membership, on_delete=models.CASCADE, related_name="documents"
+    )
+    document_type = models.CharField(max_length=50, choices=DOCUMENT_TYPES)
+    document_name = models.CharField(max_length=255)
+    file = models.FileField(upload_to="membership_documents/")
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+    remarks = models.TextField(blank=True, null=True)
+    verification_status = models.CharField(
+        max_length=20, choices=DOCUMENT_VERIFICATION_STATUS_CHOICES, default="pending")
+    verified_at = models.DateTimeField(blank=True, null=True)
+    verified_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, blank=True, null=True)
+    verification_remarks = models.TextField(blank=True, null=True)
+
+    def __str__(self):
+        return f"{self.membership.company_name} - {self.document_type}"
 
 
+class MembershipPayment(models.Model):
+    PAYMENT_METHOD_CHOICES = (
+        ("bank_transfer", "Bank Transfer"),
+        ("upi", "UPI"),
+        ("paypal", "PayPal"),
+        ("cash", "Cash"),
+        ("cheque", "Cheque"),
+        ("wire_transfer", "Wire Transfer"),
+        ("other", "Other"),
+    )
+
+    PAYMENT_STATUS_CHOICES = (
+        ("pending", "Pending"),
+        ("success", "Success"),
+        ("failed", "Failed"),
+        ("refunded", "Refunded"),
+    )
+
+    PAYMENT_VERIFICATION_STATUS_CHOICES = (
+        ("pending", "Pending"),
+        ("verified", "Verified"),
+        ("rejected", "Rejected"),
+    )
+
+    CURRENCY_CHOICES = (
+        ("INR", "INR"),
+        ("USD", "USD"),
+    )
+
+    membership = models.ForeignKey(
+        Membership, on_delete=models.CASCADE, related_name="payments"
+    )
+    payment_proof = models.FileField(
+        upload_to="payment_proofs/", blank=True, null=True)
+    payment_date = models.DateField(auto_now_add=True)
+    payment_reference = models.CharField(max_length=100, blank=True, null=True)
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    currency = models.CharField(max_length=10, choices=CURRENCY_CHOICES)
+    method = models.CharField(max_length=50, choices=PAYMENT_METHOD_CHOICES)
+    status = models.CharField(
+        max_length=20, choices=PAYMENT_STATUS_CHOICES, default="pending")
+    verification_status = models.CharField(
+        max_length=20, choices=PAYMENT_VERIFICATION_STATUS_CHOICES, default="pending")
+    verified_at = models.DateTimeField(blank=True, null=True)
+    verified_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, blank=True, null=True, related_name="verified_payments")
+    verification_remarks = models.TextField(blank=True, null=True)
+    remarks = models.TextField(blank=True, null=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.membership.company_name} - {self.amount} {self.currency}"
 
 
-
-
-# ------------------------------------------------------------
-# 4️⃣ QUOTATION – Request for product registration abroad
-# ------------------------------------------------------------
 class Quotation(models.Model):
-    membership = models.ForeignKey(Membership, on_delete=models.CASCADE)
+    STATUS_CHOICES = (
+        ("pending", "Pending"),
+        ("under_review", "Under Review"),
+        ("sent", "Sent"),
+        ("accepted", "Accepted"),
+        ("rejected", "Rejected"),
+    )
+
+    CURRENCY_CHOICES = (
+        ("INR", "INR"),
+        ("USD", "USD"),
+    )
+
+    membership = models.ForeignKey(
+        Membership, on_delete=models.CASCADE, related_name="quotations"
+    )
     country = models.CharField(max_length=100)
-    currency = models.CharField(max_length=10, default="USD")
-    responsible_person = models.CharField(max_length=100)
-    contact = models.CharField(max_length=50)
+    currency = models.CharField(max_length=10, choices=CURRENCY_CHOICES)
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
-    file = models.FileField(
-        upload_to="quotation_files/", blank=True, null=True)
-    authority_department = models.CharField(max_length=255)
+    authority_department = models.CharField(
+        max_length=255, blank=True, null=True)
     authority_website = models.URLField(blank=True, null=True)
     authority_contact_details = models.TextField(blank=True, null=True)
-    # Pending / Sent / Accepted / Rejected
-    status = models.CharField(max_length=50, default="Pending")
+    status = models.CharField(
+        max_length=50, choices=STATUS_CHOICES, default="pending"
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -220,26 +338,40 @@ class Quotation(models.Model):
 
 
 class QuotationItem(models.Model):
+    CURRENCY_CHOICES = (
+        ("INR", "INR"),
+        ("USD", "USD"),
+    )
     quotation = models.ForeignKey(
-        Quotation, on_delete=models.CASCADE, related_name="items")
+        Quotation, on_delete=models.CASCADE, related_name="items"
+    )
     product = models.ForeignKey(Product, on_delete=models.CASCADE)
-    service_name = models.CharField(
-        max_length=255)  # e.g. "Dossier Preparation"
-    description = models.TextField(blank=True, null=True)
-    quantity = models.PositiveIntegerField(default=1)
-    unit = models.CharField(max_length=50, default="Service")
-    unit_price = models.DecimalField(max_digits=10, decimal_places=2)
-    subtotal = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    currency = models.CharField(
+        max_length=10, choices=CURRENCY_CHOICES, null=True, blank=True)
+    quoted_price = models.DecimalField(
+        max_digits=12, decimal_places=2, null=True, blank=True)
+    quoted_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, blank=True, null=True)
     remarks = models.TextField(blank=True, null=True)
 
-    def save(self, *args, **kwargs):
-        self.subtotal = self.quantity * self.unit_price
-        super().save(*args, **kwargs)
+    def __str__(self):
+        return f"{self.product.product_name}"
+
+
+class QuotationGuidelineFile(models.Model):
+    quotation = models.ForeignKey(
+        Quotation, on_delete=models.CASCADE, related_name="guideline_files"
+    )
+    file_name = models.CharField(max_length=255, blank=True, null=True)
+    file = models.FileField(
+        upload_to="quotation_guidelines/", null=True, blank=True)
+    uploaded_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.service_name} ({self.product.product_name})"
+        return self.file_name or self.file.name
 
 
+'''
 # ------------------------------------------------------------
 # 5️⃣ ORDER – Generated from accepted quotation
 # ------------------------------------------------------------

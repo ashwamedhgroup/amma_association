@@ -30,7 +30,9 @@ ALLOWED_HOSTS = [
     "10.228.254.107",
     "0.0.0.0",
     "localhost",
-    "127.0.0.1"
+    "127.0.0.1",
+    "192.168.0.178",
+    "192.168.0.144"
 ]
 
 
@@ -144,8 +146,16 @@ REST_FRAMEWORK = {
 
 # CORS Configuration
 CORS_ALLOWED_ORIGINS = [
-    "http://10.228.254.137:3000",  # React development server
-    "http://10.228.254.137:5173",  # Alternative React port
+    "http://192.168.0.178:3000",    # Local IP React development server
+    "http://192.168.0.178:5173",    # Local IP Alternative React port
+    "http://192.168.0.178:8000",    # Local IP Django development server
+    "http://192.168.0.144:3000",    # Alternative local IP React development server
+    "http://192.168.0.144:5173",    # Alternative local IP Alternative React port
+    "http://192.168.0.144:8000",    # Alternative local IP Django development server
+    "http://10.228.254.137:3000",   # React development server
+    "http://10.228.254.137:5173",   # Alternative React port
+    "http://103.215.115.220:3000",  # Current IP React development server
+    "http://103.215.115.220:5173",  # Current IP Alternative React port
     "http://localhost:3000",        # Local development
     "http://localhost:3001",        # Alternative local port
 ]
